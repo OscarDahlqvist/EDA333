@@ -71,36 +71,39 @@ eliminate:
 		addiu	$sp, $sp, -8		# allocate stack frame
 		sw		$s1, 4($sp)			# save s0,s1
 		sw		$s0, 0($sp)	
-		
+	
+# <aliases>
 .eqv A 			$a0
 .eqv N 			$a1
 
-.eqv CON1F		$f0
-.eqv TMPF 		$f1
+.eqv CON1F		$f0 # for storing 1.0f
+.eqv TMPF 		$f1 # temp float register
 .eqv AKK_V 		$f2
-.eqv AIJ_V 		$f2 #not used at the same time as AKK_V so no collition
+.eqv AIJ_V 		$f2 # not used at the same time as AKK_V so both can f2
 .eqv AIK_V 		$f3
 .eqv AKJ_V 		$f4
 
-.eqv AK 		$t1
-.eqv AKK		$t2
-.eqv AKJ		$t3
-.eqv AIJ		$t4
-.eqv AIK		$t5
-.eqv AKJ_MAX	$t6
-.eqv AIK_MAX	$t7
-.eqv AK_MAX 	$t8
+					# The register aliases of the following paragrph derives from the naive v1 implementation
+.eqv AK 		$t1	# points to the first item in the currently proccessed row
+.eqv AKK		$t2 # points to the $A[k][k] in the currently proccessed row
+.eqv AKJ		$t3 # points to the $A[k][j] during doWhile_akj and doWhile_i
+.eqv AIJ		$t4 # points to the $A[i][j] during doWhile_i 
+.eqv AIK		$t5 # points to the $A[i][k] during doWhile_i
+.eqv AKJ_MAX	$t6	# AKJ_MAX != AKJ could be replaced with AKJ < AKJ_MAX, but I can use != since i know the increment steps (lt/gt check is slower)
+.eqv AIK_MAX	$t7 # AIK_MAX != AIK could be replaced with AIK < AIK_MAX, -||-
+.eqv AK_MAX 	$t8 # AK_MAX  != AK  could be replaced with AK  < AK_MAX,  -||-
 
-.eqv RWSIZE 	$t9
-.eqv AKKSTEP 	$s0
-.eqv MATRIXEND 	$s1
+.eqv RWSIZE 	$t9 # the number of bytes in a matrix row
+.eqv AKKSTEP 	$s0 # the number of bytes you must offset to reach the (1 right, 1 down) diagonal from a given space
+.eqv MATRIXEND 	$s1 # the first memory adress after the matrix (this and AIK_MAX will store adresses outside the matrix, but these are never read/written)
+# </aliases>
 
-		sll RWSIZE, N, 2 		# RWSIZE = N*4 = N*sizeof(float)
-		l.s CON1F, float1.0 	# CON1F = 1.0f
-		add AKKSTEP, RWSIZE, 4	# AKKSTEP = RWSIZE + sizeof(float) = #bytes to offset when moving pointer (1 down, 1 right)
+		sll RWSIZE, N, 2 			# RWSIZE = N*4 = N*sizeof(float)
+		l.s CON1F, float1.0 		# CON1F = 1.0f
+		add AKKSTEP, RWSIZE, 4		# AKKSTEP = RWSIZE + sizeof(float)
 		
 		move AK, A						# AK = A
-		move AKK, A					# AKK = AK
+		move AKK, A						# AKK = A
 		mul $t0, N, N					# t0 = N*N = number of cells 
 		sll $t0, $t0, 2					# t0 = t0*4 = t0*sizeof(float) = number of bytes
 		add MATRIXEND, A, $t0 			#MATRIXEND = &A[N][0]
@@ -111,10 +114,10 @@ doWhile_k:
 			add AKJ, AK, RWSIZE
 			l.s AKK_V, 0(AKK)
 doWhile_akj:
-				sub AKJ,AKJ,4				# akj -= sizeof(float)
+				sub AKJ, AKJ, 4				# akj -= sizeof(float)
 				l.s TMPF, 0(AKJ)			# TMPF = M[AKJ]
 				div.s TMPF, TMPF, AKK_V		# TMPF = M[AKJ]/M[AKK] = A[K][J] / A[K][K]
-				s.s TMPF, 0(AKJ)
+				s.s TMPF, 0(AKJ)			# A[K][J] = TMPF = A[K][J] / A[K][K]
 doWhile_akj_CMP:
 				bne AKJ, AKK, doWhile_akj
 			
@@ -124,9 +127,9 @@ doWhile_akj_CMP:
 			add AKJ_MAX, AK, RWSIZE		# AKJ_MAX = adress of first item on the next row
 			
 doWhile_i:		
-				add AIJ, AIK, 4			# AIJ = AIK + AKKSTEP (right 1, from AIK)
-				add AKJ, AKK, 4			# AKJ = AKK + AKKSTEP (right 1 from AKK)
-				l.s AIK_V, 0(AIK)		# AIK_V = M[AIK] = A[I][K]
+				add AIJ, AIK, 4				# AIJ = AIK + AKKSTEP (right 1, from AIK)
+				add AKJ, AKK, 4				# AKJ = AKK + AKKSTEP (right 1 from AKK)
+				l.s AIK_V, 0(AIK)			# AIK_V = M[AIK] = A[I][K]
 				
 doWhile_j:		
 					l.s AIJ_V, 0(AIJ)
@@ -141,13 +144,13 @@ doWhile_j_CMP:		bne AKJ, AKJ_MAX, doWhile_j	# if AKJ overflowed to the next (aka
 				
 				sw $0, 0(AIK)					# M[AIK] = 0 (works since 0x0 = 0.0f)
 				add AIK, AIK, RWSIZE			# AIK = AIK + RWSIZE (down 1 from AIK)
-doWhile_i_CMP:	bne AIK, AIK_MAX, doWhile_i		# if AIK is outside the matrix (but only checks at A[N-1][k] to improve code)
+doWhile_i_CMP:	bne AIK, AIK_MAX, doWhile_i		# if AIK is outside the matrix (only checks at A[N][k] to improve code)
 			
-			add AIK_MAX, AIK_MAX, 4 # AIK_MAX += sizeof(float)
-			add AK, AK, RWSIZE		# AK += RWSIZE (1 down)
-			add AKK, AKK, AKKSTEP	# AKK += AKKSTEP (right 1, down 1 from AKK)
+			add AIK_MAX, AIK_MAX, 4 		# AIK_MAX += sizeof(float)
+			add AK, AK, RWSIZE				# AK += RWSIZE (1 down)
+			add AKK, AKK, AKKSTEP			# AKK += AKKSTEP (right 1, down 1 from AKK)
 doWhile_k_CMP:	
-			bne AK, AK_MAX, doWhile_k	# no code should be ran for the last row since we know it must be 0 0 0 .. 0 0 1 (we assume the matrix is invertible)
+			bne AK, AK_MAX, doWhile_k	# no code need to be ran for the last row since we know it must be 0 .. 0 1 (as we assume the matrix is invertible)
 			
 		sub $t0, MATRIXEND, 4		# t0 <- adress of last item in matrix (bottom right)
 		s.s CON1F, 0($t0)			# set last item in matrix to 1.0f

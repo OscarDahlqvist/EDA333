@@ -100,21 +100,21 @@ eliminate:
 
 		sll RWSIZE, N, 2 			# RWSIZE = N*4 = N*sizeof(float)
 		l.s CON1F, float1.0 		# CON1F = 1.0f
-		add AKKSTEP, RWSIZE, 4		# AKKSTEP = RWSIZE + sizeof(float)
+		addiu AKKSTEP, RWSIZE, 4		# AKKSTEP = RWSIZE + sizeof(float)
 		
 		move AK, A						# AK = A
 		move AKK, A						# AKK = A
 		mul $t0, N, N					# t0 = N*N = number of cells 
 		sll $t0, $t0, 2					# t0 = t0*4 = t0*sizeof(float) = number of bytes
-		add MATRIXEND, A, $t0 			#MATRIXEND = &A[N][0]
-		sub AK_MAX, MATRIXEND, RWSIZE	#AK_MAX = &A[N-1][0]		
+		addu MATRIXEND, A, $t0 			#MATRIXEND = &A[N][0]
+		subu AK_MAX, MATRIXEND, RWSIZE	#AK_MAX = &A[N-1][0]		
 		
 		move AIK_MAX, MATRIXEND			#AIK_MAX = &A[N][0]										
 doWhile_k:			
-			add AKJ, AK, RWSIZE
+			addu AKJ, AK, RWSIZE
 			l.s AKK_V, 0(AKK)
 doWhile_akj:
-				sub AKJ, AKJ, 4				# akj -= sizeof(float)
+				subu AKJ, AKJ, 4				# akj -= sizeof(float)
 				l.s TMPF, 0(AKJ)			# TMPF = M[AKJ]
 				div.s TMPF, TMPF, AKK_V		# TMPF = M[AKJ]/M[AKK] = A[K][J] / A[K][K]
 				s.s TMPF, 0(AKJ)			# A[K][J] = TMPF = A[K][J] / A[K][K]
@@ -123,12 +123,12 @@ doWhile_akj_CMP:
 			
 			s.s CON1F, 0(AKK) 			# A[k][k] <- 1.0f
 			
-			add AIK, AKK, RWSIZE		# AIK = AKK + AKKSTEP (down 1 from AKK)			
-			add AKJ_MAX, AK, RWSIZE		# AKJ_MAX = adress of first item on the next row
+			addu AIK, AKK, RWSIZE		# AIK = AKK + AKKSTEP (down 1 from AKK)			
+			addu AKJ_MAX, AK, RWSIZE		# AKJ_MAX = adress of first item on the next row
 			
 doWhile_i:		
-				add AIJ, AIK, 4				# AIJ = AIK + AKKSTEP (right 1, from AIK)
-				add AKJ, AKK, 4				# AKJ = AKK + AKKSTEP (right 1 from AKK)
+				addiu AIJ, AIK, 4				# AIJ = AIK + AKKSTEP (right 1, from AIK)
+				addiu AKJ, AKK, 4				# AKJ = AKK + AKKSTEP (right 1 from AKK)
 				l.s AIK_V, 0(AIK)			# AIK_V = M[AIK] = A[I][K]
 				
 doWhile_j:		
@@ -138,21 +138,21 @@ doWhile_j:
 					sub.s TMPF, AIJ_V, TMPF		# tmp = AIJ-tmp
 					s.s TMPF, 0(AIJ)			# M[AIJ] = M[AIJ] - M[AIK] * M[AKJ] = A[i][j] - A[i][k] * A[k][j]
 		
-					add AIJ, AIJ, 4				# AIJ += sizeof(int)
-					add AKJ, AKJ, 4				# AKJ += sizeof(int)
+					addiu AIJ, AIJ, 4				# AIJ += sizeof(int)
+					addiu AKJ, AKJ, 4				# AKJ += sizeof(int)
 doWhile_j_CMP:		bne AKJ, AKJ_MAX, doWhile_j	# if AKJ overflowed to the next (aka wrong) row stop looping
 				
 				sw $0, 0(AIK)					# M[AIK] = 0 (works since 0x0 = 0.0f)
-				add AIK, AIK, RWSIZE			# AIK = AIK + RWSIZE (down 1 from AIK)
+				addu AIK, AIK, RWSIZE			# AIK = AIK + RWSIZE (down 1 from AIK)
 doWhile_i_CMP:	bne AIK, AIK_MAX, doWhile_i		# if AIK is outside the matrix (only checks at A[N][k] to improve code)
 			
-			add AIK_MAX, AIK_MAX, 4 		# AIK_MAX += sizeof(float)
-			add AK, AK, RWSIZE				# AK += RWSIZE (1 down)
-			add AKK, AKK, AKKSTEP			# AKK += AKKSTEP (right 1, down 1 from AKK)
+			addiu AIK_MAX, AIK_MAX, 4 		# AIK_MAX += sizeof(float)
+			addu AK, AK, RWSIZE				# AK += RWSIZE (1 down)
+			addu AKK, AKK, AKKSTEP			# AKK += AKKSTEP (right 1, down 1 from AKK)
 doWhile_k_CMP:	
 			bne AK, AK_MAX, doWhile_k	# no code need to be ran for the last row since we know it must be 0 .. 0 1 (as we assume the matrix is invertible)
 			
-		sub $t0, MATRIXEND, 4		# t0 <- adress of last item in matrix (bottom right)
+		subu $t0, MATRIXEND, 4		# t0 <- adress of last item in matrix (bottom right)
 		s.s CON1F, 0($t0)			# set last item in matrix to 1.0f
 		
 		###

@@ -78,8 +78,6 @@ eliminate:
 
 .eqv CON1F		$f0 # for storing 1.0f
 .eqv TMPF 		$f1 # temp float register
-.eqv TMPF2 		$f8 # temp float register
-
 .eqv AKK_iV 	$f2 # 1/*AKK
 .eqv AIJ_V 		$f2 # not used at the same time as AKK_iV so both can f2
 .eqv AIJ_V2 	$f3 
@@ -146,8 +144,7 @@ doWhile_j:
 					lwc1 AKJ_V, 0(AKJ)
 					mul.s TMPF, AIK_V, AKJ_V	# tmp = AIK x AKJ
 					sub.s TMPF, AIJ_V, TMPF		# tmp = AIJ-tmp
-					swc1 TMPF, 0(AIJ)			# A[i][j] = A[i][j] - A[i][k] * A[k][j]
-					#							# A[i][j+1] = A[i][j+1] - A[i][k] * A[k][j+1]
+					swc1 TMPF, 0(AIJ)			# M[AIJ] = M[AIJ] - M[AIK] * M[AKJ] = A[i][j] - A[i][k] * A[k][j]
 		
 					addiu AIJ, AIJ, 4				# AIJ += sizeof(int)
 					addiu AKJ, AKJ, 4				# AKJ += sizeof(int)

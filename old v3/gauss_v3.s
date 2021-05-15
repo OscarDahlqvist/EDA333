@@ -1,8 +1,8 @@
 ### Text segment
 		.text
 start:
-		la		$a0, matrix_24x24		# a0 = A (base address of matrix)
-		li		$a1, 24  		    # a1 = N (number of elements per row)
+		la		$a0, matrix_4x4		# a0 = A (base address of matrix)
+		li		$a1, 4  		    # a1 = N (number of elements per row)
 									# <debug>
 		#jal 	print_matrix	    # print matrix before elimination
 		nop							# </debug>
@@ -142,16 +142,21 @@ doWhile_i:
 				lwc1 AIK_V, 0(AIK)			# AIK_V = M[AIK] = A[I][K]
 				
 doWhile_j:		
-					lwc1 AIJ_V, 0(AIJ)
-					lwc1 AKJ_V, 0(AKJ)
+					ldc1 AIJ_V, 0(AIJ)
+					ldc1 AKJ_V, 0(AKJ)
 					mul.s TMPF, AIK_V, AKJ_V	# tmp = AIK x AKJ
-					sub.s TMPF, AIJ_V, TMPF		# tmp = AIJ-tmp
-					swc1 TMPF, 0(AIJ)			# A[i][j] = A[i][j] - A[i][k] * A[k][j]
+					mul.s TMPF2, AIK_V, AKJ_V2	# tmp = AIK x AKJ2
+					sub.s AIJ_V, AIJ_V, TMPF	# AJK -= tmp
+					sub.s AIJ_V2, AIJ_V2, TMPF2	# tmp -=  tmp
+					
+					sdc1 AIJ_V, 0(AIJ)			# A[i][j] = A[i][j] - A[i][k] * A[k][j]
 					#							# A[i][j+1] = A[i][j+1] - A[i][k] * A[k][j+1]
 		
-					addiu AIJ, AIJ, 4				# AIJ += sizeof(int)
-					addiu AKJ, AKJ, 4				# AKJ += sizeof(int)
-doWhile_j_CMP:		bne AKJ, AKJ_MAX, doWhile_j	# if AKJ overflowed to the next (aka wrong) row stop looping
+					addiu AIJ, AIJ, 8			# AIJ += sizeof(int)*2
+					addiu AKJ, AKJ, 8			# AKJ += sizeof(int)*2
+					
+doWhile_j_CMP:		slt $t0,AKJ,AKJ_MAX			# t0=1 if AKJ < AKJ_MAX
+					beq $t0, 1, doWhile_j		# if AKJ overflowed to the next (aka wrong) row stop looping
 					nop
 				
 				sw $0, 0(AIK)					# M[AIK] = 0 (works since 0x0 = 0.0f)

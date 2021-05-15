@@ -3,12 +3,18 @@
 start:
 		la		$a0, matrix_24x24		# a0 = A (base address of matrix)
 		li		$a1, 24  		    # a1 = N (number of elements per row)
+		
+		#jal		eliminate
+		#jal 	exit
+		
+		la		$a0, matrix_4x4		# a0 = A (base address of matrix)
+		li		$a1, 4  		    # a1 = N (number of elements per row)
 									# <debug>
-		#jal 	print_matrix	    # print matrix before elimination
+		jal 	print_matrix	    # print matrix before elimination
 		nop							# </debug>
 		jal 	eliminate			# triangularize matrix!
 		nop							# <debug>
-		#jal 	print_matrix		# print matrix after elimination
+		jal 	print_matrix		# print matrix after elimination
 		nop							# </debug>
 		jal 	exit
 
@@ -68,9 +74,9 @@ eliminate:
 		#}
 		
 		# If necessary, create stack frame, and save return address from ra
-		addiu	$sp, $sp, -8		# allocate stack frame
-		sw		$s1, 4($sp)			# save s0,s1
-		sw		$s0, 0($sp)	
+		#addiu	$sp, $sp, -8		# allocate stack frame
+		#sw		$s1, 4($sp)			# save s0,s1
+		#sw		$s0, 0($sp)	
 	
 # <aliases>
 .eqv A 			$a0
@@ -89,90 +95,98 @@ eliminate:
 .eqv AKJ_V2 	$f7
 
 					# The register aliases of the following paragrph derives from the naive v1 implementation
-.eqv AK 		$t1	# points to the first item in the currently proccessed row
-.eqv AKK		$t2 # points to the $A[k][k] in the currently proccessed row
-.eqv AKJ		$t3 # points to the $A[k][j] during doWhile_akj and doWhile_i
-.eqv AIJ		$t4 # points to the $A[i][j] during doWhile_i 
-.eqv AIK		$t5 # points to the $A[i][k] during doWhile_i
+.eqv NXTRW 		$t1	# points to the first item in the currently proccessed row
+.eqv AKK		$t2 # points to the &A[k][k] in the currently proccessed row
+.eqv AKJ		$t3 # points to the &A[k][j] during doWhile_akj and doWhile_i
+.eqv AIJ		$t4 # points to the &A[i][j] during doWhile_i 
+.eqv AIK		$t5 # points to the &A[i][k] during doWhile_i
 .eqv AKJ_MAX	$t6	# AKJ_MAX != AKJ could be replaced with AKJ < AKJ_MAX, but I can use != since i know the increment steps (lt/gt check is slower)
 .eqv AIK_MAX	$t7 # AIK_MAX != AIK could be replaced with AIK < AIK_MAX, -||-
-.eqv AK_MAX 	$t8 # AK_MAX  != AK  could be replaced with AK  < AK_MAX,  -||-
 
+.eqv ALIGN 		$t8
 .eqv RWSIZE 	$t9 # the number of bytes in a matrix row
 .eqv AKKSTEP 	$s0 # the number of bytes you must offset to reach the (1 right, 1 down) diagonal from a given space
 .eqv MATRIXEND 	$s1 # the first memory adress after the matrix (this and AIK_MAX will store adresses outside the matrix, but these are never read/written)
+.eqv MEMALIGN 	$s2
 # </aliases>
 
 		#TODO use ldc1 to load two floats at the same time
 		#ldc1 $f4 0(x): f4 = M[x], f5 = M[x+1]
+		#ONLY POSSIBLE FOR EVEN MATRIXES
 
-		sll RWSIZE, N, 2 			# RWSIZE = N*4 = N*sizeof(float)
-		lwc1 CON1F, float1.0 		# CON1F = 1.0f
+		sll RWSIZE, N, 2 				# RWSIZE = N*4 = N*sizeof(float)
+		lwc1 CON1F, float1.0 			# CON1F = 1.0f
 		addiu AKKSTEP, RWSIZE, 4		# AKKSTEP = RWSIZE + sizeof(float)
 		
-		move AK, A						# AK = A
-		move AKK, A						# AKK = A
+		move AKK, A						# AKK = A[0][0]
+		add NXTRW, A, RWSIZE			# NXTRW = &A[1][0]
 		mul $t0, N, N					# t0 = N*N = number of cells 
 		sll $t0, $t0, 2					# t0 = t0*4 = t0*sizeof(float) = number of bytes
-		addu MATRIXEND, A, $t0 			#MATRIXEND = &A[N][0]
-		subu AK_MAX, MATRIXEND, RWSIZE	#AK_MAX = &A[N-1][0]		
+		addu AIK_MAX, A, $t0 			#AIK_MAX = &A[N][0]	
+		move MATRIXEND, AIK_MAX	  		#MATRIXEND = &A[N][0]
 		
-		move AIK_MAX, MATRIXEND			#AIK_MAX = &A[N][0]										
+		andi ALIGN, A, 4
+		#xor ALIGN, ALIGN, 4				#ALIGN = 0b100 if A starts at non doublealligned adress
+		move MEMALIGN, ALIGN
 doWhile_k:			
-			addu AKJ, AK, RWSIZE
-			lwc1 AKK_iV, 0(AKK)
-			div.s AKK_iV, CON1F, AKK_iV		# AKK_iv = 1/M[AKK]
+			move AKJ, AKK
+			lwc1 TMPF, 0(AKK)
+			div.s AKK_iV, CON1F, TMPF		# AKK_iv = 1/M[AKK]
 doWhile_akj:
-				subu AKJ, AKJ, 4			# akj -= sizeof(float)
+				addiu $s7, $s7, 1
 				lwc1 TMPF, 0(AKJ)			# TMPF = M[AKJ]
 				mul.s TMPF, TMPF, AKK_iV	# TMPF = M[AKJ]*(1/M[AKK]) = A[K][J] / A[K][K]
 				swc1 TMPF, 0(AKJ)			# A[K][J] = TMPF = A[K][J] / A[K][K]
+				addiu AKJ, AKJ, 4			# akj += sizeof(float)
 doWhile_akj_CMP:
-				bne AKJ, AKK, doWhile_akj
+				bne AKJ, NXTRW, doWhile_akj
 				nop
 			
-			swc1 CON1F, 0(AKK) 			# A[k][k] <- 1.0f
+			swc1 CON1F, 0(AKK) 			
 			
-			addu AIK, AKK, RWSIZE		# AIK = AKK + AKKSTEP (down 1 from AKK)			
-			addu AKJ_MAX, AK, RWSIZE	# AKJ_MAX = adress of first item on the next row
+			addu AIK, AKK, RWSIZE		# AIK = AKK + RWSIZE (down 1 from AKK)	
 			
 doWhile_i:		
-				addiu AIJ, AIK, 4			# AIJ = AIK + AKKSTEP (right 1, from AIK)
-				addiu AKJ, AKK, 4			# AKJ = AKK + AKKSTEP (right 1 from AKK)
-				lwc1 AIK_V, 0(AIK)			# AIK_V = M[AIK] = A[I][K]
+				#addiu AKJ_MAX, NXTRW, -4
+				addiu AIJ, AIK, 4		
+				addiu AKJ, AKK, 4
+				lwc1 AIK_V, 0(AIK)
 				
 doWhile_j:		
 					lwc1 AIJ_V, 0(AIJ)
-					lwc1 AKJ_V, 0(AKJ)
-					mul.s TMPF, AIK_V, AKJ_V	# tmp = AIK x AKJ
-					sub.s TMPF, AIJ_V, TMPF		# tmp = AIJ-tmp
-					swc1 TMPF, 0(AIJ)			# A[i][j] = A[i][j] - A[i][k] * A[k][j]
+					lwc1 AKJ_V, 0(AKJ)					
+					mul.s TMPF, AIK_V, AKJ_V	# tmp = A[i][k] x A[k][j+1]
+					sub.s AIJ_V, AIJ_V, TMPF	# AIJ[i][j] -= tmp					
+					#mul.s TMPF, AIK_V, AKJ_V2	# tmp = A[i][k] x A[k][j+1]
+					#sub.s AIJ_V2, AIJ_V2, TMPF	# AIJ[i][j+1] -= tmp
+					addiu AKJ, AKJ, 4			# AKJ += sizeof(int)
+					swc1 AIJ_V, 0(AIJ)			# A[i][j] = A[i][j] - A[i][k] * A[k][j]
 					#							# A[i][j+1] = A[i][j+1] - A[i][k] * A[k][j+1]
 		
-					addiu AIJ, AIJ, 4				# AIJ += sizeof(int)
-					addiu AKJ, AKJ, 4				# AKJ += sizeof(int)
-doWhile_j_CMP:		bne AKJ, AKJ_MAX, doWhile_j	# if AKJ overflowed to the next (aka wrong) row stop looping
-					nop
+doWhile_j_CMP:		bne AKJ, NXTRW, doWhile_j	# if AKJ overflowed to the next (aka wrong) row stop looping
+					addiu AIJ, AIJ, 4			# AIJ += sizeof(int)
 				
 				sw $0, 0(AIK)					# M[AIK] = 0 (works since 0x0 = 0.0f)
 				addu AIK, AIK, RWSIZE			# AIK = AIK + RWSIZE (down 1 from AIK)
 doWhile_i_CMP:	bne AIK, AIK_MAX, doWhile_i		# if AIK is outside the matrix (only checks at A[N][k] to improve code)
 				nop
 			
+			xori ALIGN, ALIGN, 4
+			
 			addiu AIK_MAX, AIK_MAX, 4 		# AIK_MAX += sizeof(float)
-			addu AK, AK, RWSIZE				# AK += RWSIZE (1 down)
+			addu NXTRW, NXTRW, RWSIZE		# NXTRW += RWSIZE (1 down)
 			addu AKK, AKK, AKKSTEP			# AKK += AKKSTEP (right 1, down 1 from AKK)
 doWhile_k_CMP:	
-			bne AK, AK_MAX, doWhile_k	# no code need to be ran for the last row since we know it must be 0 .. 0 1 (as we assume the matrix is invertible)
+			bne NXTRW, MATRIXEND, doWhile_k	# no code need to be ran for the last row since we know it must be 0 .. 0 1 (as we assume the matrix is invertible)
 			nop
 			
 		subu $t0, MATRIXEND, 4		# t0 <- adress of last item in matrix (bottom right)
 		swc1 CON1F, 0($t0)			# set last item in matrix to 1.0f
 		
 		###
-		lw		$s1, 4($sp)			# restore s0,s1
-		lw		$s0, 0($sp)			#
-		addiu	$sp, $sp, 8			# remove stack frame
+		#lw		$s1, 4($sp)			# restore s0,s1
+		#lw		$s0, 0($sp)			#
+		#addiu	$sp, $sp, 8			# remove stack frame
 		jr		$ra					# return from subroutine
 		nop							# this is the delay slot associated with all types of jumps
 

@@ -8,8 +8,8 @@ start:
 		nop
 		jal 	exit
 		
-		la		$a0, matrix_4x4		# a0 = A (base address of matrix)
-		li		$a1, 4  		    # a1 = N (number of elements per row)
+		#la		$a0, matrix_4x4		# a0 = A (base address of matrix)
+		#li		$a1, 4  		    # a1 = N (number of elements per row)
 									# <debug>
 		jal 	print_matrix	    # print matrix before elimination
 		nop							# </debug>
@@ -53,7 +53,6 @@ exit:
 .eqv RWSIZE 	$t8 # the number of bytes in a matrix row
 .eqv AKKSTEP 	$t9 # the number of bytes you must offset to reach the (1 right, 1 down) diagonal from a given space
 .eqv MATRIXEND 	$v0 # the first memory adress after the matrix
-.eqv ALIGN 		$v1 # 
 # </aliases>
 eliminate:
 		#<setup>
@@ -70,72 +69,77 @@ eliminate:
 		#</setup>
 		
 		andi $t0, N, 1					#t0 = 1 if N is odd
-		beq $t0, 1, eliminate_slow		
+		beq $t0, 1, eliminateSlow		
 		andi $t0, A, 4 					#t0 = 4 if not double alligned
-		beq $t0, 4, eliminate_slow
+		beq $t0, 4, eliminateSlow
 
-eliminate_alligned_even:
-		andi ALIGN, A, 4
-elim_k:			
+eliminateAllignedEven:
+		#ONLY POSSIBLE FOR EVEN AND DOUBLE ALLIGNED MATRIXES
+doWhile_k:			
 			lwc1 TMPF, 0(AKK)
-			add AKJ, AKK, 4				# start iterating from A[K][K+1]
-			andi AKJ, AKJ, -5			#  rounded down to nearest double
+			move AKJ, AKK
 			div.s AKK_iV, CON1F, TMPF	# AKK_iv = 1/A[K][K], Some precition is lost here
-elim_akj:
-				ldc1 AKJ_V, 0(AKJ)			# tmp = A[K][J]
-				addiu AKJ, AKJ, 8			# AKJ += sizeof(float)*2
-				mul.s AKJ_V, AKJ_V, AKK_iV	# A[K][J] = A[K][J] / A[K][K]
-				mul.s AKJ_V2, AKJ_V2, AKK_iV# A[K][J+1] = A[K][J+1] / A[K][K]
-elim_akj_CMP:
-				bne AKJ, NXTRW, elim_akj
-				sdc1 AKJ_V, -8(AKJ)			# A[K][J] = TMPF = A[K][J] / A[K][K]
-											#  -8 offset since AKJ has already been increased
-											
-			swc1 CON1F, 0(AKK) 			# unneccesary half of the time but it's slower to check for it		
+doWhile_akj:
+				lwc1 TMPF, 0(AKJ)			# TMPF = M[AKJ]
+				addiu AKJ, AKJ, 4			# akj += sizeof(float)
+				mul.s TMPF, TMPF, AKK_iV	# TMPF = M[AKJ]*(1/M[AKK]) = A[K][J] / A[K][K]
+doWhile_akj_CMP:
+				bne AKJ, NXTRW, doWhile_akj
+				swc1 TMPF, -4(AKJ)			# A[K][J] = TMPF = A[K][J] / A[K][K]
+			
+			swc1 CON1F, 0(AKK) 			
+			
 			addu AIK, AKK, RWSIZE		# AIK = AKK + RWSIZE (down 1 from AKK)	
 			
-elim_i:		
+doWhile_i:		
 				lwc1 AIK_V, 0(AIK)
 				
-				addu AIJ, AIK, ALIGN		# the ALIGN means that we sometimes add 4 to the starting point of the iteration to ensure doubleword alignment.
-				addu AKJ, AKK, ALIGN		#  however, when 4 isn't added it means M[AIK] will be overwritten by the first iteration of elim_j
-											#  this is not a problem however since we alread fetched the correct AIK_V before writing garbage
-											#  and M[AIK] is overwritten with 0 afterwards				
-elim_j:		
+				#addiu AKJ_MAX, 4-ALIGN		commented out code which could, in combination with some other steps
+				#addu AIJ, AIK, ALIGN		allow non double alligned even matrixes, but that technique would
+				#addu AKJ, AKK, ALIGN		be slower
+				
+				andi AIJ, AIK, -5				# round down to nearest double alligned index (AIK & ~4) (~4 == -5)
+				andi AKJ, AKK, -5				#  If rounded down this will result in AIK being overwritten with garbage.
+												#  But this if fine since this adress will be overwritten with 0 on line 128
+												
+				addu AIK, AIK, RWSIZE			# AIK += RWSIZE (move AIK one space down)
+				
+doWhile_j:		
 					ldc1 AKJ_V, 0(AKJ)	
 					ldc1 AIJ_V, 0(AIJ)				
 					mul.s TMPF, AIK_V, AKJ_V		# tmp = A[i][k] x A[k][j]
-					sub.s AIJ_V, AIJ_V, TMPF		# A[i][j] -= tmp
+					sub.s AIJ_V, AIJ_V, TMPF		# AIJ[i][j] -= tmp
 					mul.s TMPF, AIK_V, AKJ_V2		# tmp = A[i][k] x A[k][j+1]
-					sub.s AIJ_V2, AIJ_V2, TMPF		# A[i][j+1] -= tmp
+					sub.s AIJ_V2, AIJ_V2, TMPF		# AIJ[i][j+1] -= tmp
 					
 					addiu AKJ, AKJ, 8				# AKJ += sizeof(float)*2
 					
 					sdc1 AIJ_V, 0(AIJ)				# A[i][j] = A[i][j] - A[i][k] * A[k][j]
 													# A[i][j+1] = A[i][j+1] - A[i][k] * A[k][j+1]
 		
-elim_j_CMP:			bne AKJ, NXTRW, elim_j		# if AKJ overflowed to the next (aka wrong) row stop looping
-					addiu AIJ, AIJ, 8			# AIJ += sizeof(float)*2
+doWhile_j_CMP:		bne AKJ, NXTRW, doWhile_j		# if AKJ overflowed to the next (aka wrong) row stop looping
+					addiu AIJ, AIJ, 8				# AIJ += sizeof(int)
 				
-				sw $0, 0(AIK)					# no need for coproc1 operations here since 0.0f = 0x0
-elim_i_CMP:		bne AIK, AIK_MAX, elim_i		# if AIK is outside the matrix (only checks at A[N][k] to improve efficiency)
-				addu AIK, AIK, RWSIZE			# AIK += RWSIZE (move AIK one space down)
+doWhile_i_CMP:	bne AIK, AIK_MAX, doWhile_i		# if AIK is outside the matrix (only checks at A[N][k] to improve code)
+				sw $0, 0(NXTRW)					# AKJ will equal the first index of the next row since it overflowed
 			
-			xori ALIGN, ALIGN, 4			# Every other line can not have 4 added (or doubleword misaligment)
+			#xori ALIGN, ALIGN, 4
 			
 			addu NXTRW, NXTRW, RWSIZE		# NXTRW += RWSIZE (1 down)
 			addiu AIK_MAX, AIK_MAX, 4 		# AIK_MAX += sizeof(float)
-elim_k_CMP:	
-			bne NXTRW, MATRIXEND, elim_k	# no code need to be ran for the last row since we know it must be 0 .. 0 1 (as we assume the matrix is invertible)
+doWhile_k_CMP:	
+			bne NXTRW, MATRIXEND, doWhile_k	# no code need to be ran for the last row since we know it must be 0 .. 0 1 (as we assume the matrix is invertible)
 			addu AKK, AKK, AKKSTEP			# AKK += AKKSTEP (right 1, down 1 from AKK)
+			
+		#29 words of code in the main loop, fits inside 32 words of I-Cache, very nice
 			
 		subu $t0, MATRIXEND, 4			# t0 <- adress of last item in matrix (bottom right)
 		
 		jr	 $ra						# return from subroutine
 		swc1 CON1F, 0($t0)				# set last item in matrix to 1.0f
-
+		
 ################################################################################
-eliminate_slow:
+eliminateSlow:
 elim2_k:			
 			lwc1 TMPF, 0(AKK)
 			add AKJ, AKK, 4				# start iterating from A[K][K+1]

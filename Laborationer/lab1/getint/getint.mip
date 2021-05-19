@@ -1,0 +1,19 @@
+getint
+C:\dst\labs\lab1\getint\
+Objects\
+2
+C:\dst\labs\lab1\getint\getint.s
+0
+0
+C:\dst\labs\lab1\getint\kernel.s
+0
+0
+1
+minic
+0
+0
+0
+0
+1
+objcopy.exe -O srec getint.out getint.srec
+80020000 start

@@ -1,0 +1,19 @@
+bfind
+C:\dst\labs\lab1\bfind\
+Objects\
+2
+C:\dst\labs\lab1\bfind\bfind.s
+0
+0
+C:\dst\labs\lab1\bfind\kernel.s
+0
+0
+1
+minic
+0
+0
+0
+0
+1
+objcopy.exe -O srec bfind.out bfind.srec
+80020000 start

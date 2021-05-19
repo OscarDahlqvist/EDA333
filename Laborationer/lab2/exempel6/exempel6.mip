@@ -1,0 +1,16 @@
+exempel6
+\\Gandalf\d00moe\dst\labs\lab2\exempel6\
+Objects\
+1
+\\Gandalf\d00moe\dst\labs\lab2\exempel6\exempel6.s
+0
+0
+1
+minic
+0
+0
+0
+0
+1
+objcopy.exe -O srec exempel6.out exempel6.srec
+80020000 start

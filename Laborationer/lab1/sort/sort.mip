@@ -1,0 +1,19 @@
+sort
+C:\dst\labs\lab1\sort\
+Objects\
+2
+C:\dst\labs\lab1\sort\kernel.s
+0
+0
+C:\dst\labs\lab1\sort\sort.s
+0
+0
+1
+minic
+0
+0
+0
+0
+1
+objcopy.exe -O srec sort.out sort.srec
+80020000 start

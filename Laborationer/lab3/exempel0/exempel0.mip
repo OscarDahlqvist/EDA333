@@ -1,0 +1,16 @@
+exempel0
+C:\dst\labs\lab3\exempel0\
+Objects\
+1
+C:\dst\labs\lab3\exempel0\exempel0.s
+0
+0
+1
+minic
+0
+0
+0
+0
+1
+objcopy.exe -O srec exempel0.out exempel0.srec
+80020000 start

@@ -1,0 +1,23 @@
+program
+C:\dst\labs\lab1\program\
+Objects\
+1
+C:\dst\labs\lab1\program\program.c
+1
+0
+2
+gcc
+minic
+3
+O3
+nostdinc
+msoft-float
+2
+N
+nostdlib
+1
+crt0.o
+0
+1
+objcopy.exe -O srec program.out program.srec
+80020000 start

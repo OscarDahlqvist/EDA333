@@ -1,0 +1,19 @@
+loop
+C:\dst\labs\lab1\loop\
+Objects\
+2
+C:\dst\labs\lab1\loop\kernel.s
+0
+0
+C:\dst\labs\lab1\loop\loop.s
+0
+0
+1
+minic
+0
+0
+0
+0
+1
+objcopy.exe -O srec loop.out loop.srec
+80020000 start

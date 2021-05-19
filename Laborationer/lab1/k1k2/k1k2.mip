@@ -1,0 +1,19 @@
+k1k2
+C:\dst\labs\k1k2\
+Objects\
+2
+C:\dst\labs\k1k2\k1k2.s
+0
+0
+C:\dst\labs\k1k2\kernel.s
+0
+0
+1
+minic
+0
+0
+0
+0
+1
+objcopy.exe -O srec k1k2.out k1k2.srec
+80020000 start

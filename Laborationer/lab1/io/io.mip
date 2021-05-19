@@ -1,0 +1,19 @@
+io
+C:\dst\labs\lab1\io\
+Objects\
+2
+C:\dst\labs\lab1\io\io.s
+0
+0
+C:\dst\labs\lab1\io\kernel_io.s
+0
+0
+1
+minic
+0
+0
+0
+0
+1
+objcopy.exe -O srec io.out io.srec
+80020000 start

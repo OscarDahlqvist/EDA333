@@ -1,0 +1,22 @@
+exempel2
+C:\dst\labs\lab3\exempel2\
+Objects\
+1
+C:\dst\labs\lab3\exempel2\exempel2.c
+1
+0
+2
+gcc
+minic
+2
+nostdinc
+msoft-float
+2
+N
+nostdlib
+1
+crt0.o
+0
+1
+objcopy.exe -O srec exempel2.out exempel2.srec
+80020000 start

@@ -4,12 +4,12 @@ start:
 		la		$a0, matrix_24x24		# a0 = A (base address of matrix)
 		li		$a1, 24  		    # a1 = N (number of elements per row)
 		
-		jal		eliminate
+		#jal		eliminate
 		nop
-		jal 	exit
+		#jal 	exit
 		
-		la		$a0, matrix_4x4		# a0 = A (base address of matrix)
-		li		$a1, 4  		    # a1 = N (number of elements per row)
+		#la		$a0, matrix_4x4		# a0 = A (base address of matrix)
+		#li		$a1, 4  		    # a1 = N (number of elements per row)
 									# <debug>
 		jal 	print_matrix	    # print matrix before elimination
 		nop							# </debug>
@@ -121,7 +121,7 @@ elim_j_CMP:			bne AKJ, NXTRW, elim_j		# if AKJ overflowed to the next (aka wrong
 elim_i_CMP:		bne AIK, AIK_MAX, elim_i		# if AIK is outside the matrix (only checks at A[N][k] to improve efficiency)
 				addu AIK, AIK, RWSIZE			# AIK += RWSIZE (move AIK one space down)
 			
-			xori ALIGN, ALIGN, 4			# Every other line can not have 4 added (or doubleword misaligment)
+			xori ALIGN, ALIGN, 4			# Every other line can not have 4 added (or doubleword will not be alligned)
 			
 			addu NXTRW, NXTRW, RWSIZE		# NXTRW += RWSIZE (1 down)
 			addiu AIK_MAX, AIK_MAX, 4 		# AIK_MAX += sizeof(float)

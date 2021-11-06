@@ -1,0 +1,147 @@
+
+\renewcommand\thesection{\Alph{section}}
+\setcounter{section}{0}
+\section{Hardware Constraints}
+\label{sec:hardware_constaints}
+
+\subsection{Processor}
+The base hardware is a computer system consists of a MIPS-compatible microprocessor with five pipeline 
+stages and delayed branching. There are also two coprocessors, one for memory 
+management and exception handling and one for floating point 
+arithmetic operations.
+The CPU operates at a clock frequency of 500 MHz and its price is 2C\$. 
+\subsection{Caches}
+The memory system includes separate instruction and data caches. The block 
+replacement policy is Least Recently Used (LRU) and the write policy is Write Back. 
+Cache size, block size and associativity are 
+configurable parameters and they can be set differently for the two caches. Available 
+configurations are given in table \ref{cache_table}.
+\begin{table}[h]
+	\centering
+	\begin{tabular}{|l|l|l|l|l|} \hline
+        Name & Cache Size & Associativity & Max Clock Frequency & Extra Cost        \\ \hline\hline
+        32A &32	& 1	& 500	& 0        \\ \hline
+        32B &32	& 2	& 475	& 0        \\ \hline
+        32C &32	& 4	& 450	& 0        \\ \hline
+        64A &64	& 1	& 475	& 0.25        \\ \hline
+        64B &64	& 2	& 450	& 0.25        \\ \hline
+        64C &64	& 4	& 425	& 0.25        \\ \hline
+        128A &128	& 1	& 450	& 0.5        \\ \hline
+        128B &128	& 2	& 425	& 0.5        \\ \hline
+        128C &128	& 4	& 400	& 0.5        \\ \hline
+	\end{tabular}
+	\caption{Available Caches}
+	\label{cache_table}
+\end{table}
+\subsubsection{Write Buffer}
+The data cache has an optional write buffer of variable size to reduce the number of 
+stall cycles due to memory writes. 
+The cost of buffer space is 0.03 C\$/word. You are allowed to use a write buffer of up 
+to 12 words, or none at all
+
+
+
+\subsection{Memory}
+There are two types of memory modules to choose from. Table \ref{memory_table} lists their 
+costs and their latencies for the first word as well as for other words that are accessed 
+from a block. 
+\begin{table}[H]
+	\centering
+	\begin{tabular}{|l|l|l|l|} \hline
+        Type & $1_{st}$ word access time (ns) & Access time, other words (ns) & Cost (C\$) \\ \hline\hline
+        A	& 44	& 8	& 0.5        \\ \hline
+        B	& 30	& 6	& 1.0        \\ \hline
+	\end{tabular}
+	\caption{Available Memory}
+	\label{memory_table}
+\end{table}
+
+\newpage
+\section{Simple Gaussian Elimination}
+\label{sec:gaussian_elim_c_code}
+\begin{verbatim}
+/* reduce matrix A to upper triangular form */
+void eliminate (double **A, int N) { 
+    int i, j, k; 
+    /* loop over all diagonal (pivot) elements */ 
+    for (k = 0; k < N; k++) { 
+        /* for all elements in pivot row right of pivot element */ 
+        for (j = k + 1; j < N; j++) { //Normalize row
+            /* divide by pivot element */
+            A[k][j] = A[k][j] / A[k][k];
+        } 
+        /* set pivot element to 1.0 */
+        A[k][k] = 1.0; 
+        /* for all elements below pivot row right of pivot column */ 
+        for (i = k + 1; i < N; i++) { // Subtract row k from others
+            for (j = k + 1; j < N; j++) {
+                A[i][j] = A[i][j] - A[i][k] * A[k][j];
+            }
+            A[i][k] = 0.0; 
+        }
+    } /* end pivot loop */
+} /* end eliminate *
+\end{verbatim}
+
+\newpage
+\section{Gaussian elimination using pointers}
+\label{sec:gaussian_elim_index_c_code}
+\begin{verbatim}
+void eliminate (double **A, int N) { 
+    float* ak, akk, aik, akj, aij
+    float* akjMax, aikMax, akMax, matrixEnd
+    int rowSize, akkStep
+    
+    rowSize = N * sizeof(float)
+    akkStep = rowSize + sizeof(float)
+    
+    ak = A
+    akk = A
+    matrixEnd = A+N*N*sizeof(float)
+    akMax = matrixEnd - rowSize
+    
+    aikMax = matrixEnd
+    
+    do {
+        akj = ak+rowSize
+        do {
+            akj -= sizeof(float)
+            *akj /= *akk
+        } while (akj != akk)
+
+        *akk = 1
+        
+        aik = akk+rowSize
+        akjMax = ak+rowSize
+        
+        do {
+            aij = aik + 4
+            akj = akk + 4
+            do {
+                *aij = *aij - *aik * *akj
+                aij += sizeof(float)
+                akj += sizeof(float)
+            } while (akj != akjMax)
+            *aik = 0.0f
+            aik += rowSize
+        } while (aik != aikMax)
+            
+        aik_max += sizeof(float)
+        ak += sizeof(float)
+        akk += akkStep
+    } while (ak != akMax)
+}
+\end{verbatim}
+
+\newpage
+\section{Extended Test Results}
+\label{sec:full_stats}
+\begin{figure}[H]
+    \includepdf[page={1},angle=-90,origin=c, scale=0.8]{x_runs.pdf}
+\end{figure}
+
+\newpage
+\tiny
+\section{Final Code}
+\label{sec:final_code}
+\input{code.tex}

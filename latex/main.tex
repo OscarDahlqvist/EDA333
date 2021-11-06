@@ -1,0 +1,177 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{fancyvrb}
+\usepackage{array,multirow,graphicx}
+\usepackage{float}
+\usepackage{pdfpages}
+\usepackage{lscape}
+\addtolength{\topmargin}{-50pt}
+\addtolength{\textheight}{100pt}
+
+\title{Optimizing Hardware and Software for Gaussian Elimination
+\large \\ Computer Systems Engineering (EDA332) Assignment}
+\author{Oscar Dahlqvist}
+\date{21-05-2021}
+
+\begin{document}
+
+\maketitle
+
+\newpage
+\tableofcontents
+
+\setcounter{subsection}{0}
+\newpage
+\section{Introduction}
+This assignment aims to produce hardware and software for a hypothetical company which demands a
+cheap and fast microcomputer meant to handle Gaussian elimination efficiently. 
+The mission of this report is to achieve the lowest Price*Performance number by writing optimised code for  available hardware components.
+
+\section{The Assignment}
+\subsection{Software}
+Implement the elimination routine in MIPS assembler. Use single precision floating 
+point instructions for all matrix computations. The program should run in the MIPS 
+simulator MARS.
+\subsection{Hardware}
+Pick parts for a computer system considering both price and performance using the components in Appendix A. Performance is measured as the time it takes your program to triangularize a 24 × 24 reference matrix. 
+Price is the sum of the component costs for processor, caches and memory. The goal 
+is to minimize the product Price × Performance. The unit of this measure is µsC\$
+(microSecondChalmersDollar)
+
+\section{Development}
+The final code and hardware setup can be found in Appendix \ref{sec:final_code}.
+\subsection{Software}
+The first step of software development was writing a slow implementation of the algorithm to make sure the it worked, a .c version of this implementation can be found in Appendix \ref{sec:gaussian_elim_c_code}.
+\\\\
+The second step was to always use pointers instead of array indexing since indexing is a demanding 
+process with several calculations in comparison with pointers which require as little as a single add operation. Pointers keeping track of \verb!A[k][k], !\verb!A[k][j]!, \verb!A[i][k]! \& \verb!A[i][j]! were added. (\verb!AKK, AKJ, AIK, AIJ!)
+Using indexing requires some thought since the code isn't only iterating right to left. Several registers needed to be used to store values which consider how the pointers should move after operations are performed on certain squares. Pseudo code for the pointer version van be found in Appendix \ref{sec:gaussian_elim_index_c_code}. 
+\\\\
+Several smaller optimizations were also made. Such as avoiding the slower floating point division and instead multiplying with \verb!1/A[k][k]! during the normalization and replacing all less than/greater than comparisons with equality checks and pre-calculating exactly where the last iteration step will end up. All stalls due to load-use and branch hazards were also removed by moving parts of the code, thankfully it is possible to remove all these hazards without adding any delay with this algorithm. 
+\\\\
+The trickiest optimization to do is to use the double loads/store operations of the floating point processor instead of loading each index separately. This could ideally half the number of iterations which needed to be done, at the cost of that each iteration would need take longer.
+\\\\
+However, this technique does cause several problems due to the fact that the doubles-store/load must be double aligned in memory. Another issue is that this technique will not work for odd matrices due to the following row sometimes being overwritten. While this somewhat could be prevented by stopping earlier and adding special cases this report hasn't done that since it would require more code slowing the program down and in practice the assignment was to optimize for a 24x24 matrix. But the code will still retain a copy the single word method which will be ran instead the program if supplied an odd matrix.
+\\\\
+It's relatively straightforward to implement double-store for the normalization loop (\verb!A[k][j] /= pivot!) by rounding the start of the iteration pointer down to the nearest double aligned address. This means that sometimes we will divide the pivot with itself, but as the pivot is set to 1.0 later regardless this is not a problem. The later subtraction loop is not much different. If rounded down just as the normalization it works. A[i][k] will end up overwritten half of the rows, but like the normalization, this is not a problem since A[i][k] is overwritten with 0 later.
+\begin{figure}[h]
+  \begin{minipage}{.45\linewidth}
+    \centering
+    $\begin{bmatrix}
+      AKK & AKJ & .. & ..\\
+      AIK & AIJ & .. & ..\\
+      ..  & ..  & .. & ..\\
+      ..  & ..  & .. & ..
+    \end{bmatrix}$\\
+    Step 1
+  \end{minipage}
+  \begin{minipage}{.45\linewidth}
+    \centering
+    $\begin{bmatrix}
+      AKK & .. & AKJ & ..\\
+      AIK & .. & AIJ & ..\\
+      ..  & ..  & .. & ..\\
+      ..  & ..  & .. & ..
+    \end{bmatrix}$\\
+    Step 2
+  \end{minipage}
+  \caption{How AIK and AKJ points during the single-store/load method}
+\end{figure}
+\begin{figure}[h]
+  \begin{minipage}{.45\linewidth}
+    \centering
+    $\begin{bmatrix}
+      AKK / AKJ & .. & .. & ..\\
+      AIK / AIJ & .. & .. & ..\\
+      ..  & ..  & .. & ..\\
+      ..  & ..  & .. & ..
+    \end{bmatrix}$\\Step 1
+  \end{minipage}
+  \begin{minipage}{.45\linewidth}
+    \centering
+    $\begin{bmatrix}
+      AKK & .. & AKJ & ..\\
+      AIK & .. & AIJ & ..\\
+      ..  & ..  & .. & ..\\
+      ..  & ..  & .. & ..
+    \end{bmatrix}$\\
+    Step 2
+  \end{minipage}
+  \caption{How AIK and AKJ points during the double-store/load method}
+\end{figure}\\
+Finally, instead of starting (AKJ,AIJ) at (AKK+4*, AIK+4) and rounding down it was faster to only add an alignment variable which toggles between 0 and 4. The toggling was made by xor-ing the variable with 4 for each k iteration.
+\\\\
+* 4 since the sizeof(float) = 4, hence adding 4 will point to the next element.
+
+\subsection{Hardware}
+The choice of simulated hardware mostly came after the code was written but small tweaks and previous versions were tested against each other to see which cycles count improves with which code. The choice of components matter not only to the price, caches also has a max frequency they can be ran at. The frequency of the slowest cache determines how fast we can clock the CPU, and hence how fast we can run the code. For the full specs available for each part check out Appendix \ref{sec:hardware_constaints}
+\\\\
+Regardless of version code with the best allowed hardware most of the execution time is spent on different types of stalling. The hardware choice matters a lot. Each part can give both positive and negative effects depending on the other hardware, say a faster frequency leads to the memory not being able to keep up. So while there are several areas of consider what fits the program testing a large sample of configurations is necessary to find the optimal.
+\subsubsection{I-Cache}
+Instruction cache misses is something you want to avoid at all costs and is very avoidable depending on how you code. The final main loop ended up 32 words, meaning it can be cached in it's entirety. Hence there is no need to have anything greater than the basic 32 word cache. That is, if the main loop is aligned to the cache blocks. Since if the main loop is not aligned it can't be fully cached, and performance will worsen. About a 2\% difference in my code (See table \ref{offest_table})
+\begin{table}[h]
+	\centering
+	\begin{tabular}{|l|l|l|l|l|l|l|l|l|} \hline
+        offset & 0 &	1 &	2 &	3 &	4 &	5 &	6 &	7 \\\hline
+        cycles & 82958 &	82993 &	82993 &	83113 &	83113 &	81453 &	82958 &	82958 \\\hline
+        misses & 1890 &	1925 &	1925 &	1925 &	1925 &	385 &	1890 &	1890 \\\hline
+	\end{tabular}
+	\caption{Effect of code alignment (for 8 word cache block size)}
+	\label{offest_table}
+\end{table}
+\\
+While the code could be made slightly faster with some loop unrolling this will result in more I-cache misses, which is a way bigger issue compared to the measly cycles that could be saved via loop unrolling. This could be combated with a larger cache, but the cost associated would mean you would need a ~10\% (very approximate number, depends on the rest of the hardware) performance increase to justify larger I-cache. To achieve better I-cache alignment extra NOP:s were added before the start of the function
+\subsubsection{D-Cache}
+The read and writes from the data memory are very spread out in the matrix which makes cache miss behaviour very unpredictable. Caching the whole Matrix is impossible with even the biggest cache so my approach was simply to test several combinations of cache sizes and configurations. All I know is that high associativity should be helpful.
+\subsubsection{Memory/Write buffer}
+It's not hard to make sure the write buffer usage is 100\% but if it won't reach 100\% even with a maxed size buffer you should increase the memory speed or the cache.
+\\\\
+Even though the memory access time is constant the cycle count to access memory wont due to the frequency of the cache.
+\newpage
+\section{Results}
+\input{runs.tex}
+
+\newpage
+\section{Conclusion}
+The best hardware configuration found is:
+\begin{description}
+    \item[CPU] The CPU clocked 450mHz due to the D-Cache speed for 2C\$.
+    \item[I-Cache] Any 32 word cache works for 0C\$.
+    \item[D-Cache] 64 words of 2 way associative cache with 16 blocks with 4 words for each block for 0.25C\$.
+    \item[Memory] The faster memory (B) for 0.5C\$.
+    \item[Write Buffer] 5 bytes of buffer for 0.15C\$.
+\end{description}
+\begin{figure}[h]
+    \begin{minipage}{.79\linewidth}
+        \centering
+        \includegraphics[scale=.4]{stats.png}
+	    \caption{Program breakdown from MARS}
+	\end{minipage}
+    \begin{minipage}{.2\linewidth}
+        \centering
+        \begin{tabular}{|l|l|} \hline
+            Cycles & 81453 \\\hline
+            Time (\mu s) & 181.01 \\\hline
+            Price (C\$) & 3.4 \\\hline
+            \mu sC\$  & 615.42 \\\hline
+	    \end{tabular}
+        \centering
+	    \caption{\\Stats of optimal solution}
+	\end{minipage}
+\end{figure}
+
+\subsection{Improvement Ideas}
+\begin{description}
+    \item[More Cases] Another double-store algorithm could be implemented for odd matrices
+    \item[Use more cache effective algorithm] The biggest percent of stalling is caused by D-Cache misses, if one were to use and algorithm which only accesses limited parts of the matrix at a time instead of all over this could greatly be reduced.
+    \item[Use a better algorithm in general] Better algorithms exist, but that a task for another day and another course.
+\end{description}
+
+
+
+\newpage
+\input{appendix.tex}
+
+
+\end{document}

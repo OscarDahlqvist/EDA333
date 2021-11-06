@@ -8,8 +8,8 @@ start:
 		nop
 		jal 	exit
 		
-		#la		$a0, matrix_4x4		# a0 = A (base address of matrix)
-		#li		$a1, 4  		    # a1 = N (number of elements per row)
+		la		$a0, matrix_4x4		# a0 = A (base address of matrix)
+		li		$a1, 4  		    # a1 = N (number of elements per row)
 									# <debug>
 		jal 	print_matrix	    # print matrix before elimination
 		nop							# </debug>
@@ -99,11 +99,9 @@ doWhile_i:
 				#addu AKJ, AKK, ALIGN		be slower
 				
 				andi AIJ, AIK, -5				# round down to nearest double alligned index (AIK & ~4) (~4 == -5)
-				andi AKJ, AKK, -5				#  If rounded down this will result in AIK being overwritten with garbage.
+				andi AKJ, AKK, -5				#  AIK will end up overwritten with 0 A[i][j] = A[i][j] - A[i][k] * A[k][j]
 												#  But this if fine since this adress will be overwritten with 0 on line 128
 												
-				addu AIK, AIK, RWSIZE			# AIK += RWSIZE (move AIK one space down)
-				
 doWhile_j:		
 					ldc1 AKJ_V, 0(AKJ)	
 					ldc1 AIJ_V, 0(AIJ)				
@@ -121,7 +119,7 @@ doWhile_j_CMP:		bne AKJ, NXTRW, doWhile_j		# if AKJ overflowed to the next (aka 
 					addiu AIJ, AIJ, 8				# AIJ += sizeof(int)
 				
 doWhile_i_CMP:	bne AIK, AIK_MAX, doWhile_i		# if AIK is outside the matrix (only checks at A[N][k] to improve code)
-				sw $0, 0(NXTRW)					# AKJ will equal the first index of the next row since it overflowed
+				addu AIK, AIK, RWSIZE			# AIK += RWSIZE (move AIK one space down)
 			
 			#xori ALIGN, ALIGN, 4
 			

@@ -4,12 +4,12 @@ start:
 		la		$a0, matrix_24x24		# a0 = A (base address of matrix)
 		li		$a1, 24  		    # a1 = N (number of elements per row)
 		
-		#jal		eliminate
+		jal		eliminate
 		nop
-		#jal 	exit
+		jal 	exit
 		
-		#la		$a0, matrix_4x4		# a0 = A (base address of matrix)
-		#li		$a1, 4  		    # a1 = N (number of elements per row)
+		la		$a0, matrix_4x4		# a0 = A (base address of matrix)
+		li		$a1, 4  		    # a1 = N (number of elements per row)
 									# <debug>
 		jal 	print_matrix	    # print matrix before elimination
 		nop							# </debug>
@@ -55,6 +55,11 @@ exit:
 .eqv MATRIXEND 	$v0 # the first memory adress after the matrix
 .eqv ALIGN 		$v1 # 
 # </aliases>
+nop
+nop	# Padding to get the best
+nop # I-Cache allignment
+nop # added last of everything
+nop
 eliminate:
 		#<setup>
 		sll RWSIZE, N, 2 				# RWSIZE = N*4 = N*sizeof(float)
@@ -78,8 +83,7 @@ eliminate_alligned_even:
 		andi ALIGN, A, 4
 elim_k:			
 			lwc1 TMPF, 0(AKK)
-			add AKJ, AKK, 4				# start iterating from A[K][K+1]
-			andi AKJ, AKJ, -5			#  rounded down to nearest double
+			add AKJ, AKK, ALIGN			# start iterating from A[K][K+1] or A[K][K] depending on allign
 			div.s AKK_iV, CON1F, TMPF	# AKK_iv = 1/A[K][K], Some precition is lost here
 elim_akj:
 				ldc1 AKJ_V, 0(AKJ)			# tmp = A[K][J]

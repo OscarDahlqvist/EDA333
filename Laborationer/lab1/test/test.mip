@@ -1,0 +1,19 @@
+test
+E:\BACKUP\wilux\git\EDA333\Laborationer\lab1\test\
+Objects\
+0
+2
+gcc
+minic
+2
+nostdinc
+msoft-float
+2
+N
+nostdlib
+1
+crt0.o
+0
+1
+objcopy.exe -O srec test.out test.srec
+80020000 start
